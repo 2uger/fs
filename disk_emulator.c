@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 
+
 #define BLOCK_SIZE 512
 #define BLOCKS_NUM 512
 
@@ -17,6 +18,7 @@ struct block DISK[BLOCKS_NUM];
 
 int read_block(int, int, void*);
 int write_disk(int, void*, int);
+
 
 /*
  * blockn - block number(start with zero)
@@ -62,7 +64,6 @@ write_block(int blockn, void *buffer, int size)
     uint8_t remainder = (size % BLOCK_SIZE) > 0 ? 1 : 0;
     int blocks_num = (int)(size / BLOCK_SIZE) + remainder;
 
-    printf("Blocks num:%d\n", blocks_num);
     if (blockn + blocks_num > BLOCKS_NUM) {
         printf("Out of blocks!\n");
         return 0;
@@ -108,8 +109,6 @@ main()
 
     bytes = read_block(0, 1, block_storage);
     assert(bytes == BLOCK_SIZE);
-    printf("Read block read: %d\n", bytes);
-    printf("Read block: %s\n", block_storage);
 
     bytes = write_block(0, test_string, BLOCKS_NUM * BLOCK_SIZE + 1);
     assert(bytes == 0);
