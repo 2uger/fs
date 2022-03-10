@@ -59,6 +59,6 @@ struct dirent {
     int inum;
 }__attribute__((packed));
 
-enum InodeType {FILE=1, DIRECTORY, DEVICE};
+enum InodeType {FREE=0, FILE, DIRECTORY, DEVICE};
 
 #endif

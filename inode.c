@@ -96,8 +96,6 @@ bfree(int blockn) {
 
 // Inodes code
 //
-// Simple example is:
-
 // ialloc(int dev, int num) -- allocate fresh inode in disk
 //                             (create file actually)
 // iget(int dev, int num) -- return in memory copy of demanding inode
@@ -106,33 +104,23 @@ bfree(int blockn) {
 //                               read from memory if necessary
 
 // In memory inodes
-struct {
-    // lock
-    struct inode inode[INODES_PER_BLOCK];
-} itable;
+struct inode inodes[INODES_NUM];
 
-// init in memory inodes data structure
-void
-iinit(void)
-{
-    struct inode *in;
-    for (in = &itable.inode[0]; in < &itable.inode[INODES_PER_BLOCK]; in++) {
-    }
-}
-
-// allocating new inode on disk
+/*
+ * allocating new inode on disk
+ */
 struct inode*
-ialloc(uint32_t dev, uint8_t type)
+ialloc(int type)
 {
     struct CacheBuffer *b;
     struct dinode *din;
 
-    for (uint32_t i = 0; i < spb.inodes_num; i++) {
-        int kkk = IBLOCK(i, spb);
-        b = bread(dev, kkk);
+    for (int i = 0; i < spb.inodes_num; i++) {
+        int ib = IBLOCK(i, spb);
+        b = bread(ib);
         din = (struct dinode*)b->data + i % INODES_PER_BLOCK;
-        if (din->type == 0) {
-            mmemset(din, 0, sizeof(struct dinode));
+        if (din->type == FREE) {
+            memset(din, 0, sizeof(struct dinode));
             din->type = type;
             bwrite(b);
             brelease(b);
@@ -140,41 +128,43 @@ ialloc(uint32_t dev, uint8_t type)
         }
         brelease(b);
     }
-    panic("no free inodes");
+    printf("ERROR: no free inodes\n");
 }
 
-// copy in memory inode to disk
+/*
+ * copy in memory inode to disk
+ */
 void
 iupdate(struct inode *in)
 {
     struct CacheBuffer *b;
     struct dinode *dn;
 
-    kprintf("Num of inode is %d\n", IBLOCK(in->inum, spb));
     b = bget(in->dev, IBLOCK(in->inum, spb));
     dn = (struct dinode*)b->data + in->inum % INODES_PER_BLOCK;
     dn->type = in->type;
     dn->nlink = in->nlink;
     dn->size = in->size;
-    mmemmove(dn->addrs, in->addrs, sizeof(in->addrs));
+    memmove(dn->addrs, in->addrs, sizeof(in->addrs));
     bwrite(b);
     brelease(b);
 }
 
 
-// return in memory inode
-// if not find => return new one
-// doesnt read from disk => valid = 0
-// TODO: It won't work at least because there is not always the inode we really need
+/*
+ * return in memory inode
+ * if not find => return new one
+ * doesnt read from disk => valid = 0
+ */
 struct inode*
-iget(uint32_t dev, uint32_t inum)
+iget(int inum)
 {
     struct inode *in, *empty;
 
     empty = NULL;
 
-    for (in = itable.inode; in < &itable.inode[INODES_PER_BLOCK]; in++) {
-        if (in->ref > 0 && in->dev == dev && in->inum == inum) {
+    for (in = inodes; in < &inodes[INODES_NUM]; in++) {
+        if (in->ref > 0 && in->inum == inum) {
             in->ref++;
             return in;
         }
@@ -182,52 +172,21 @@ iget(uint32_t dev, uint32_t inum)
             empty = in;
     }
     if (empty == NULL)
-        panic("iget: don't finding inode in memory");
+        printf("ERROR: don't finding inode in memory\n");
     in = empty;
-    in->dev = dev;
     in->inum = inum;
     in->ref = 1;
     in->valid = 0;
     return in;
 }
-//
-// lock inode, read from disk if necessary
-void
-ilock(struct inode *in)
-{
-    struct CacheBuffer *buf;
-    struct dinode *dn;
 
-    if (in == NULL || in->ref == 0)
-        panic("ilock: bad inode");
-
-    kprintf("Inode num while ilock is %d\n", in->inum);
-    if (in->valid == 0) {
-        // read from disk
-        buf = bread(in->dev, IBLOCK(in->inum, spb));
-        dn = (struct dinode*)buf->data + in->inum % INODES_PER_BLOCK;
-        in->type = dn->type;
-        in->nlink = dn->nlink;
-        in->size = dn->size;
-        mmemmove(in->addrs, dn->addrs, sizeof(in->addrs));
-        brelease(buf);
-        in->valid = 1;
-        if (in->type == 0)
-            panic("ilock: inode got no type");
-    }
-}
-
-// unlcok inode
-void
-iunlock(struct inode *inode)
-{
-}
-
-// truncate inode on disk
+/*
+ * truncate inode on disk
+ */
 void
 itrunc(struct inode *ip)
 {
-    for (uint32_t i = 0; i < DATA_BLOCKS_NUM; i++) {
+    for (int i = 0; i < DATA_BLOCKS_NUM; i++) {
         if (ip->addrs[i]) {
             bfree(ip->dev, i);
             ip->addrs[i] = 0;
@@ -235,9 +194,10 @@ itrunc(struct inode *ip)
     }
 }
 
-// drop reference on inode in memory
-// if that was last memory reference, recycle inode vacation in memory
-// if no more dir links to inode on disk, free inode in memory and on disk
+/* drop reference on inode in memory
+ * if that was last memory reference, recycle inode vacation in memory
+ * if no more dir links to inode on disk, free inode in memory and on disk
+ */
 void
 iput(struct inode *ip)
 {

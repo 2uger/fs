@@ -10,6 +10,7 @@
 
 // inodes
 
+#define INODES_NUM 20
 // how much data blocks inode could addressing
 #define DATA_BLOCKS_NUM 16
 #define MAX_FILE_NAME 16
