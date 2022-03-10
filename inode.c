@@ -80,12 +80,12 @@ static void
 bfree(int blockn) {
     struct CacheBuffer *b;
     // bitmap block
-    b = bread((BMBLOCK(block_num, spb)));
+    b = bread((BMBLOCK(blockn, spb)));
 
-    int bm = block_num % BPB;
+    int bm = blockn % BPB;
     int m = 1 << (bm % 8);
 
-    if (b->data[bm/8] & m == 0)
+    if ((b->data[bm/8] & m) == 0)
         printf("ERROR: try to free block, that already free");
 
     // 000-1-000 -> 000-0-000
@@ -124,7 +124,7 @@ ialloc(int type)
             din->type = type;
             bwrite(b);
             brelease(b);
-            return iget(dev, i);
+            return iget(i);
         }
         brelease(b);
     }
@@ -140,7 +140,7 @@ iupdate(struct inode *in)
     struct CacheBuffer *b;
     struct dinode *dn;
 
-    b = bget(in->dev, IBLOCK(in->inum, spb));
+    b = bget(IBLOCK(in->inum, spb));
     dn = (struct dinode*)b->data + in->inum % INODES_PER_BLOCK;
     dn->type = in->type;
     dn->nlink = in->nlink;
@@ -188,13 +188,14 @@ itrunc(struct inode *ip)
 {
     for (int i = 0; i < DATA_BLOCKS_NUM; i++) {
         if (ip->addrs[i]) {
-            bfree(ip->dev, i);
+            bfree(i);
             ip->addrs[i] = 0;
         }
     }
 }
 
-/* drop reference on inode in memory
+/* 
+ * drop reference on inode in memory
  * if that was last memory reference, recycle inode vacation in memory
  * if no more dir links to inode on disk, free inode in memory and on disk
  */
@@ -211,58 +212,60 @@ iput(struct inode *ip)
 }
 
 
-// inode content
-// return block number in file system by 
-// block number in current inode
-uint32_t
-bmap(struct inode *in, uint32_t bn)
+/* 
+ * inode content
+ * return block number in file system by 
+ * block number in current inode
+ */
+int
+bmap(struct inode *in, int bn)
 {
-    uint32_t addr;
+    int addr;
     if ((addr = in->addrs[bn]) == 0)
-        in->addrs[bn] = addr = balloc(in->dev);
-    kprintf("Address is %d\n", addr);
+        in->addrs[bn] = addr = balloc();
     return addr;
 }
 
-// read information from inode 
-// off - offset
-// n   - size of information to read
-uint32_t
-readi(struct inode *in, uint32_t dst_addr, uint32_t off, uint32_t n)
+/* 
+ * read information from inode 
+ * off - offset
+ * n   - size of information to read
+ */
+int
+readi(struct inode *in, int dst_addr, int off, int n)
 {
-    // how many bytes read
-    uint32_t tot;
+    // how many bytes to read
+    int tot;
     // offset in current block
-    uint32_t m;
-    struct CacheBuffer *buf;
+    int m;
+    struct CacheBuffer *b;
 
     if (off > in->size)
         return 0;
+
     if (off + n > in->size)
         n = in->size - off;
 
     for (tot = 0; tot < n; tot += m, off += m, dst_addr += m) {
-        kprintf("Get buffer for readi\n");
-        buf = bread(in->dev, bmap(in, off / BLOCK_SIZE));
-        kprintf("%s\n", buf->data);
+        b = bread(bmap(in, off / BLOCK_SIZE));
 
         m = min(n - tot, BLOCK_SIZE - off % BLOCK_SIZE);
         // copy data to dst addrs
-        mmemmove(dst_addr, buf->data, m);
+        memmove(dst_addr, b->data, m);
     }
 }
 
 
-uint32_t
-writei(struct inode *in, uint32_t src_addr, uint32_t off, uint32_t n)
+int
+writei(struct inode *in, int src_addr, int off, int n)
 {
-    kprintf("Size of inode %d,  %d\n", in->size, in->inum);
-    uint32_t tot;
-    uint32_t m;
+    int tot;
+    int m;
     struct CacheBuffer *buf;
 
     if (off > in->size || n < 0)
         return -1;
+
     // impossible to read more than all filesystem have
     if (off + n > DATA_BLOCKS_NUM * BLOCK_SIZE)
         return -1;
@@ -270,65 +273,63 @@ writei(struct inode *in, uint32_t src_addr, uint32_t off, uint32_t n)
     for (tot = 0; tot < n; tot += m, off += m, src_addr += m) {
         // iterate through inode data blocks, that inode
         // store in addrs field
-        kprintf("Get buffer for writei\n");
-        buf = bread(in->dev, bmap(in, off / BLOCK_SIZE));
+        buf = bread(bmap(in, off / BLOCK_SIZE));
         // first case is when we stop reading from somewhere inside block
         m = min(n - tot, BLOCK_SIZE - off % BLOCK_SIZE);
-        mmemmove(buf->data, src_addr, m);
+        memmove(buf->data, src_addr, m);
         // put buffer into disk with new data
         bwrite(buf);
         brelease(buf);
     }
     // means write more data to end of file or rewrite part of that
     in->size = (off > in->size) ? off : in->size;
-    kprintf("Size of inode %d,  %d\n", in->size, in->inum);
     iupdate(in);
     return tot;
 }
 
-// as for now, we dont have directory hierarchy, because just want to test
-// simple inodes with file names and one directory, that store all of them
+/*
+ * as for now, we dont have directory hierarchy, because just want to test
+ * simple inodes with file names and one directory, that store all of them
+ */
 struct inode*
 dirlookup(struct inode *dir, char *filename)
 {
     struct dirent *de;
 
-    if (dir->type != DIRECTORY)
-        panic("dirlookup: directory inode has wrong type");
-    
-    for (uint32_t off = 0; off < dir->size; off += sizeof(struct dirent)) {
+    for (int off = 0; off < dir->size; off += sizeof(struct dirent)) {
         readi(dir, de, off, sizeof(struct dirent));
-        if (sstrcmp(de->name, filename, MAX_FILE_NAME)) {
-            return iget(0, de->inum);
-        }
+        if (strcmp(de->name, filename)) 
+            return iget(de->inum);
     }
     return 0;
 }
 
-// add new entry in directory
-uint32_t
-dirlink(struct inode *dir, char *name, uint32_t inum)
+/* 
+ * add new entry in directory
+ */
+int
+dirlink(struct inode *dir, char *name, int inum)
 {
-    uint32_t off;
+    int off;
     struct dirent *de;
     struct inode *in;
 
-    kprintf("Size of inode %d,  %d\n", dir->size, dir->inum);
     if ((in = dirlookup(dir, name)) != 0) {
         iput(in);
         return -1;
     }
+
     for (off = 0; off < dir->size; off += sizeof(struct dirent)) {
         if (readi(dir, de, off, sizeof(struct dirent)) != sizeof(struct dirent))
-            panic("dirlink: bad entry in directory");
+            printf("ERROR: dirlink: bad entry in directory\n");
         if (de->inum == 0)
             break;
     }
-    mmemmove(de->name, name, 2);
+    memmove(de->name, name, 2);
     de->inum = inum;
-    kprintf("Size of inode %d,  %d\n", dir->size, dir->inum);
+
     if (writei(dir, de, off, sizeof(struct dirent)) != sizeof(struct dirent))
-        panic("dirlink: can't write new entry to dir");
+        printf("ERROR:dirlink: can't write new entry to dir\n");
 
     return 0;
 }

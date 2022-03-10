@@ -14,4 +14,9 @@ struct CacheBuffer {
     char data[BLOCK_SIZE];
 };
 
+struct CacheBuffer* bget(int);
+struct CacheBuffer* bread(int);
+void bwrite(struct CacheBuffer*);
+void brelease(struct CacheBuffer*);
+
 #endif

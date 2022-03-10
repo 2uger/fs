@@ -59,6 +59,22 @@ struct dirent {
     int inum;
 }__attribute__((packed));
 
-enum InodeType {FREE=0, FILE, DIRECTORY, DEVICE};
+enum InodeType {FREE=0, FILEE, DIRECTORY, DEVICE};
+
+
+int balloc();
+
+struct inode* ialloc(int);
+void iupdate(struct inode*);
+struct inode* iget(int);
+void itruct(struct inode*);
+void iput(struct inode*);
+
+int bmap(struct inode*, int);
+int readi(struct inode*, int, int, int);
+int writei(struct inode*, int, int, int);
+
+struct inode* dirlookup(struct inode*, char*);
+int dirlink(struct inode*, char*, int);
 
 #endif
