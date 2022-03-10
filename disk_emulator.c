@@ -4,20 +4,11 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "disk_emulator.h"
+#include "param.h"
 
-#define BLOCK_SIZE 512
-#define BLOCKS_NUM 512
-
-
-struct block {
-    char data[BLOCK_SIZE];        
-};
 
 struct block DISK[BLOCKS_NUM];
-
-
-int read_block(int, int, void*);
-int write_disk(int, void*, int);
 
 
 /*
@@ -93,7 +84,7 @@ write_block(int blockn, void *buffer, int size)
 }
 
 int
-main()
+test()
 {
     char block_storage[BLOCK_SIZE];
     char test_string[] = "Hello world!";
