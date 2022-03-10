@@ -11,85 +11,78 @@
 // *** Need interface to sd card, emulate it with array and some calls
 // *** Start with simple buffer cache, double linked list
 // *** Think about how double linked list should be init so we can
-// follow on last recently buffer
+//     follow on last recently buffer
+
 #include <stdint.h>
+#include <stdio.h>
 
-#include "defs.h"
-#include "param.h"
+#include "disk_emulator.h"
 #include "buf.h"
+#include "param.h"
 
-struct {
-    struct CacheBuffer buf[BCACHE_NUM];
-} bcache;
 
-// Init cache buffer
-// For init locks on buffers
-void
-binit(void)
-{
-    struct CacheBuffer *b;
+struct CacheBuffer buf[BCACHE_NUM];
 
-    for (b = bcache.buf; b < &bcache.buf[BCACHE_NUM]; b++) {
-    }
-}
-
-// Scan through array and find 
+/*
+ * Scan through memory array and find demanding block
+ */
 struct CacheBuffer* 
-bget(uint32_t dev, uint32_t blockn)
+bget(int blockn)
 {
     //Scan buffer array, if find return, else allocate a new one
-    struct CacheBuffer *buf;
+    struct CacheBuffer *b;
 
-
-    for (buf = bcache.buf; buf < &bcache.buf[BCACHE_NUM]; buf++) {
-        // find block with same dev and block num
-        if (buf->dev == dev && buf->blockn == blockn) {
-            buf->refcnt++;
-            return buf;
+    for (b = buf; buf < &buf[BCACHE_NUM]; b++) {
+        if (b->blockn == blockn) {
+            b->refcnt++;
+            return b;
         }
     }
     
     // dont find demanding block, allocate a new one
-    for (buf = bcache.buf; buf < &bcache.buf[BCACHE_NUM]; buf++) {
-        if (buf->refcnt == 0) {
-            kprintf("Current data is %s,   %d\n", buf->data, blockn);
-            buf->dev = dev;
-            buf->blockn = blockn;
-            buf->valid = 0;
-            buf->refcnt = 1;
-            return buf;
+    for (b = buf; b < &buf[BCACHE_NUM]; b++) {
+        if (b->refcnt == 0) {
+            b->blockn = blockn;
+            b->valid = 0;
+            b->refcnt = 1;
+            return b;
         }
     }
-    panic("can't allocate new free cache buffer");
+    printf("ERROR: can't allocate new free cache buffer\n");
 }
 
-// Return buffer with actual data
+/*
+ * return valid cache buffer or allocate new one
+ */
 struct CacheBuffer* 
-bread(uint32_t dev, uint32_t blockn)
+bread(int blockn)
 {
-    struct CacheBuffer* buf;
+    struct CacheBuffer* b;
     
-    // call bget, if it's new, call read routine from sd card
-    buf = bget(dev, blockn);
-    if (!buf->valid) {
+    b = bget(blockn);
+    if (!b->valid) {
         // read into buffer from disk
-        read_disk(blockn, 1, buf->data); 
-        buf->valid = 1;
+        read_block(blockn, 1, b->data); 
+        b->valid = 1;
     }
-    return buf;
+    return b;
 }
 
 void
-bwrite(struct CacheBuffer *buf)
+bwrite(struct CacheBuffer *b)
 {
-    struct CacheBuffer *b;
-
-    // Write buffer content into sd card
-    write_disk(buf->blockn, buf->data, sizeof(buf->data));
+    write_block(b->blockn, b->data, sizeof(b->data));
 }
 
 void
-brelease(struct CacheBuffer *buf)
+brelease(struct CacheBuffer *b)
 {
-    buf->refcnt--;
+    b->refcnt--;
 }
+
+int
+main()
+{
+    return 0;
+}
+

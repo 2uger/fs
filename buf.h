@@ -6,15 +6,12 @@
 #include "param.h"
 
 struct CacheBuffer {
-    uint32_t valid;
-    uint16_t dirty; // data should we written into disk
+    int valid;
 
-    uint32_t dev; // device number
-    uint32_t blockn; // block number on disk
-    
-    uint16_t refcnt; // users amount
+    int refcnt;
 
-    char data[BLOCK_SIZE]; // actual data
+    int blockn; // block number on disk
+    char data[BLOCK_SIZE];
 };
 
 #endif
