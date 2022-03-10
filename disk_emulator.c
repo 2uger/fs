@@ -76,8 +76,6 @@ write_block(int blockn, void *buffer, int size)
     struct block *b;
     b = DISK + blockn;
 
-    uint8_t stop_writing = 0;
-
     while (size) {
         for (int i = 0; i < BLOCK_SIZE; i++) {
             b->data[i] = *buf;
@@ -86,12 +84,9 @@ write_block(int blockn, void *buffer, int size)
             size--;
             
             if (size == 0) {
-                stop_writing = 1;
                 break;
             }
         }
-        if (stop_writing)
-            break;
         b++;
     }
     return byte_counter; 
@@ -112,6 +107,7 @@ main()
 
     bytes = write_block(0, test_string, BLOCKS_NUM * BLOCK_SIZE + 1);
     assert(bytes == 0);
+    printf("Tests passed!!!\n");
     return 0;
 }
 
