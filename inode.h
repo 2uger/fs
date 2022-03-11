@@ -74,7 +74,4 @@ int bmap(struct inode*, int);
 int readi(struct inode*, int, int, int);
 int writei(struct inode*, int, int, int);
 
-struct inode* dirlookup(struct inode*, char*);
-int dirlink(struct inode*, char*, int);
-
 #endif
