@@ -55,23 +55,26 @@ struct inode {
 
 // directory is a file containing links to file
 struct dirent {
-    char name[MAX_FILE_NAME];
     int inum;
+    char name[MAX_FILE_NAME];
 }__attribute__((packed));
 
 enum InodeType {FREE=0, FILEE, DIRECTORY, DEVICE};
 
+
+void init_spb();
+void init_bitmap();
 
 int balloc();
 
 struct inode* ialloc(int);
 void iupdate(struct inode*);
 struct inode* iget(int);
-void itruct(struct inode*);
+void itrunc(struct inode*);
 void iput(struct inode*);
 
 int bmap(struct inode*, int);
-int readi(struct inode*, int, int, int);
-int writei(struct inode*, int, int, int);
+int readi(struct inode*, void*, int, int);
+int writei(struct inode*, void*, int, int);
 
 #endif

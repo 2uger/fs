@@ -17,10 +17,45 @@ struct spblock spb;
 
 
 void
+init_spb()
+{
+    struct CacheBuffer* b;
+    b = bread(0);
+
+    spb.magic = 0x12;
+    spb.size = BLOCKS_NUM;
+
+    spb.data_blocks_num = DATA_BLOCKS_NUM;
+    spb.inodes_num = INODES_NUM;
+    
+    spb.inodes_start = 1;
+    spb.bitmap_start = 2;
+
+    memset(b->data, &spb, sizeof(struct spblock));
+    bwrite(b);
+    brelease(b);
+}
+
+void
+init_bitmap()
+{
+    struct CacheBuffer *b;
+    b = bread(2);
+    
+    // TODO: count how many blocks needed for inodes to not loose space
+    int inode_blocks_num = INODES_NUM / INODES_PER_BLOCK + 1;
+    // fill bitmap to find free blocks on disk after last "system" block
+    memset(b->data, 0xFF, 1 + inode_blocks_num + spb.size / BPB);
+
+    bwrite(b);
+    brelease(b);
+}
+
+void
 readspblock(struct spblock *spb)
 {
     struct CacheBuffer *b;
-    b = bread( 0);
+    b = bread(0);
     memmove(spb, b->data, sizeof(struct spblock));
     brelease(b);
 }
@@ -96,10 +131,10 @@ bfree(int blockn) {
 
 // Inodes code
 //
-// ialloc(int dev, int num) -- allocate fresh inode in disk
-//                             (create file actually)
-// iget(int dev, int num) -- return in memory copy of demanding inode
-//                           if no such inode -> process empty slot
+// ialloc(int num) -- allocate fresh inode in disk
+//                    (create file actually)
+// iget(int num) -- return in memory copy of demanding inode
+//                  if no such inode -> process empty slot
 // ilock(struct inode *inode) -- locking in memory inode, so you can modify it
 //                               read from memory if necessary
 
@@ -112,6 +147,7 @@ struct inode inodes[INODES_NUM];
 struct inode*
 ialloc(int type)
 {
+    printf("ialloc: start allocation inode\n");
     struct CacheBuffer *b;
     struct dinode *din;
 
@@ -124,6 +160,7 @@ ialloc(int type)
             din->type = type;
             bwrite(b);
             brelease(b);
+            printf("ialloc: allocate inode: %d\n", i);
             return iget(i);
         }
         brelease(b);
@@ -177,6 +214,7 @@ iget(int inum)
     in->inum = inum;
     in->ref = 1;
     in->valid = 0;
+    printf("iget: create new inode in memory\n");
     return in;
 }
 
@@ -232,54 +270,61 @@ bmap(struct inode *in, int bn)
  * n   - size of information to read
  */
 int
-readi(struct inode *in, int dst_addr, int off, int n)
+readi(struct inode *in, void *dst, int off, int n)
 {
-    // how many bytes to read
-    int tot;
     // offset in current block
     int m;
-    struct CacheBuffer *b;
+    struct CacheBuffer *ib;
 
     if (off > in->size)
         return 0;
 
     if (off + n > in->size)
         n = in->size - off;
-
-    for (tot = 0; tot < n; tot += m, off += m, dst_addr += m) {
-        b = bread(bmap(in, off / BLOCK_SIZE));
-
+    // how many bytes to read
+    int tot;
+    for (tot = 0; tot < n; tot += m, off += m) {
+        printf("%d, %d, %d\n", dst, off, n);
+        ib = bread(bmap(in, off / BLOCK_SIZE));
+        
+        // because we could be almost at the end of the block
         m = min(n - tot, BLOCK_SIZE - off % BLOCK_SIZE);
+
         // copy data to dst addrs
-        memmove(dst_addr, b->data, m);
+        memmove(dst, ib->data, m);
+        
+        brelease(ib);
     }
 }
 
-
+/* 
+ * write information to inode 
+ * off - offset
+ * n   - size of information to read
+ */
 int
-writei(struct inode *in, int src_addr, int off, int n)
+writei(struct inode *in, void* src, int off, int n)
 {
     int tot;
     int m;
-    struct CacheBuffer *buf;
+    struct CacheBuffer *ib;
 
     if (off > in->size || n < 0)
-        return -1;
+        return 0;
 
     // impossible to read more than all filesystem have
     if (off + n > DATA_BLOCKS_NUM * BLOCK_SIZE)
-        return -1;
+        return 0;
 
-    for (tot = 0; tot < n; tot += m, off += m, src_addr += m) {
-        // iterate through inode data blocks, that inode
-        // store in addrs field
-        buf = bread(bmap(in, off / BLOCK_SIZE));
+    for (tot = 0; tot < n; tot += m, off += m) {
+        ib = bread(bmap(in, off / BLOCK_SIZE));
         // first case is when we stop reading from somewhere inside block
         m = min(n - tot, BLOCK_SIZE - off % BLOCK_SIZE);
-        memmove(buf->data, src_addr, m);
-        // put buffer into disk with new data
-        bwrite(buf);
-        brelease(buf);
+
+        memmove(ib->data, src, m);
+
+        bwrite(ib);
+        brelease(ib);
     }
     // means write more data to end of file or rewrite part of that
     in->size = (off > in->size) ? off : in->size;

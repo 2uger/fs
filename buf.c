@@ -29,12 +29,14 @@ struct CacheBuffer buf[BCACHE_NUM];
 struct CacheBuffer* 
 bget(int blockn)
 {
+    printf("bget: get by block number: %d\n", blockn);
     //Scan buffer array, if find return, else allocate a new one
     struct CacheBuffer *b;
 
-    for (b = buf; buf < &buf[BCACHE_NUM]; b++) {
+    for (b = buf; b < &buf[BCACHE_NUM]; b++) {
         if (b->blockn == blockn) {
             b->refcnt++;
+            printf("bget: find demanding block: %d\n", blockn);
             return b;
         }
     }
@@ -45,6 +47,7 @@ bget(int blockn)
             b->blockn = blockn;
             b->valid = 0;
             b->refcnt = 1;
+            printf("bget: allocate new block for: %d\n", blockn);
             return b;
         }
     }
@@ -57,6 +60,7 @@ bget(int blockn)
 struct CacheBuffer* 
 bread(int blockn)
 {
+    printf("bread: read by block number\n");
     struct CacheBuffer* b;
     
     b = bget(blockn);
@@ -78,11 +82,5 @@ void
 brelease(struct CacheBuffer *b)
 {
     b->refcnt--;
-}
-
-int
-main()
-{
-    return 0;
 }
 

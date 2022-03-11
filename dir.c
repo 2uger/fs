@@ -14,15 +14,16 @@
 struct inode*
 dirlookup(struct inode *dir, char *filename)
 {
-    struct dirent *de;
+    struct dirent de;
 
     for (int off = 0; off < dir->size; off += sizeof(struct dirent)) {
-        readi(dir, de, off, sizeof(struct dirent));
-        if (strcmp(de->name, filename)) 
-            return iget(de->inum);
+        readi(dir, &de, off, sizeof(struct dirent));
+        if (strcmp(de.name, filename) == 0)
+            return iget(de.inum);
     }
     return 0;
 }
+struct dirent de;
 
 /* 
  * add new entry in directory
@@ -31,24 +32,28 @@ int
 dirlink(struct inode *dir, char *name, int inum)
 {
     int off;
-    struct dirent *de;
-    struct inode *in;
 
-    if ((in = dirlookup(dir, name)) != 0) {
-        iput(in);
-        return -1;
-    }
+    printf("1\n");
+    //if ((in = dirlookup(dir, name)) != 0) {
+    //    iput(in);
+    //    return -1;
+    //}
 
+    printf("2\n");
     for (off = 0; off < dir->size; off += sizeof(struct dirent)) {
-        if (readi(dir, de, off, sizeof(struct dirent)) != sizeof(struct dirent))
+        printf("2\n");
+        if (readi(dir, &de, off, sizeof(struct dirent)) == sizeof(struct dirent))
             printf("ERROR: dirlink: bad entry in directory\n");
-        if (de->inum == 0)
+        if (de.inum == 0)
             break;
+        printf("readi dir\n");
     }
-    memmove(de->name, name, 2);
-    de->inum = inum;
+    printf("3\n");
+    strcpy(de.name, name);
+    de.inum = inum;
 
-    if (writei(dir, de, off, sizeof(struct dirent)) != sizeof(struct dirent))
+    printf("4\n");
+    if (writei(dir, &de, off, sizeof(struct dirent)) != sizeof(struct dirent))
         printf("ERROR:dirlink: can't write new entry to dir\n");
 
     return 0;
