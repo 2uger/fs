@@ -33,26 +33,20 @@ dirlink(struct inode *dir, char *name, int inum)
 {
     int off;
 
-    printf("1\n");
     //if ((in = dirlookup(dir, name)) != 0) {
     //    iput(in);
     //    return -1;
     //}
 
-    printf("2\n");
     for (off = 0; off < dir->size; off += sizeof(struct dirent)) {
-        printf("2\n");
         if (readi(dir, &de, off, sizeof(struct dirent)) == sizeof(struct dirent))
             printf("ERROR: dirlink: bad entry in directory\n");
         if (de.inum == 0)
             break;
-        printf("readi dir\n");
     }
-    printf("3\n");
     strcpy(de.name, name);
     de.inum = inum;
 
-    printf("4\n");
     if (writei(dir, &de, off, sizeof(struct dirent)) != sizeof(struct dirent))
         printf("ERROR:dirlink: can't write new entry to dir\n");
 

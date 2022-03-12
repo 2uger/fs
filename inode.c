@@ -147,7 +147,6 @@ struct inode inodes[INODES_NUM];
 struct inode*
 ialloc(int type)
 {
-    printf("ialloc: start allocation inode\n");
     struct CacheBuffer *b;
     struct dinode *din;
 
@@ -160,7 +159,6 @@ ialloc(int type)
             din->type = type;
             bwrite(b);
             brelease(b);
-            printf("ialloc: allocate inode: %d\n", i);
             return iget(i);
         }
         brelease(b);
@@ -214,7 +212,6 @@ iget(int inum)
     in->inum = inum;
     in->ref = 1;
     in->valid = 0;
-    printf("iget: create new inode in memory\n");
     return in;
 }
 
@@ -284,7 +281,6 @@ readi(struct inode *in, void *dst, int off, int n)
     // how many bytes to read
     int tot;
     for (tot = 0; tot < n; tot += m, off += m) {
-        printf("%d, %d, %d\n", dst, off, n);
         ib = bread(bmap(in, off / BLOCK_SIZE));
         
         // because we could be almost at the end of the block
