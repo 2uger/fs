@@ -23,7 +23,6 @@ dirlookup(struct inode *dir, char *filename)
     }
     return 0;
 }
-struct dirent de;
 
 /* 
  * add new entry in directory
@@ -31,13 +30,15 @@ struct dirent de;
 int
 dirlink(struct inode *dir, char *name, int inum)
 {
+    struct inode *in;
+    struct dirent de;
+
+    if ((in = dirlookup(dir, name)) != 0) {
+        iput(in);
+        return -1;
+    }
+
     int off;
-
-    //if ((in = dirlookup(dir, name)) != 0) {
-    //    iput(in);
-    //    return -1;
-    //}
-
     for (off = 0; off < dir->size; off += sizeof(struct dirent)) {
         if (readi(dir, &de, off, sizeof(struct dirent)) == sizeof(struct dirent))
             printf("ERROR: dirlink: bad entry in directory\n");
