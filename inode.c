@@ -287,7 +287,7 @@ readi(struct inode *in, void *dst, int off, int n)
         m = min(n - tot, BLOCK_SIZE - off % BLOCK_SIZE);
 
         // copy data to dst addrs
-        memmove(dst, ib->data, m);
+        memmove(dst, ib->data + off % BLOCK_SIZE, m);
         
         brelease(ib);
     }
@@ -317,7 +317,7 @@ writei(struct inode *in, void* src, int off, int n)
         // first case is when we stop reading from somewhere inside block
         m = min(n - tot, BLOCK_SIZE - off % BLOCK_SIZE);
 
-        memmove(ib->data, src, m);
+        memmove(ib->data + (off % BLOCK_SIZE), src, m);
 
         bwrite(ib);
         brelease(ib);
