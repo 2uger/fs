@@ -20,18 +20,18 @@ void
 init_spb()
 {
     struct CacheBuffer* b;
-    b = bread(0);
+    b = bread(SPB_BLOCK_NUM);
 
-    spb.magic = 0x12;
+    spb.magic = MAGIC_NUM;
     spb.size = BLOCKS_NUM;
 
     spb.data_blocks_num = DATA_BLOCKS_NUM;
     spb.inodes_num = INODES_NUM;
     
-    spb.inodes_start = 1;
-    spb.bitmap_start = 2;
+    spb.inodes_start = INODES_START;
+    spb.bitmap_start = BITMAP_START;
 
-    memset(b->data, &spb, sizeof(struct spblock));
+    memcpy(b->data, &spb, sizeof(struct spblock));
     bwrite(b);
     brelease(b);
 }
@@ -65,7 +65,7 @@ zeroblock(int blockn)
 {
     struct CacheBuffer *b;
     b = bread(blockn);
-    memset(b, 0, BLOCK_SIZE);
+    memset(b->data, 0, BLOCK_SIZE);
     bwrite(b);
     brelease(b);
 }
