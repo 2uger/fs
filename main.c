@@ -5,6 +5,8 @@
 
 #include "inode.h"
 #include "dir.h"
+#include "buf.h"
+#include "disk_emulator.h"
 #include "calls.h"
 #include "param.h"
 
@@ -25,14 +27,38 @@ fs_init()
     iupdate(root_dir);
 }
 
-int
-main()
+void
+test_spb()
 {
-    printf("Initialize file system\n");
+    struct CacheBuffer b;
+    read_block(SPB_BLOCK_NUM, 1, b.data);
 
-    fs_init();
+    struct spblock *disk_spb = (struct spblock*)b.data;
 
-    char file_name[] = "new_file";
+    assert(disk_spb->magic == MAGIC_NUM);
+    assert(disk_spb->inodes_start == INODES_START);
+    assert(disk_spb->size == BLOCKS_NUM);
+}
+
+void
+test_create_file()
+{
+    char file_name[] = "file_1";
+    assert(creat(file_name) == 0);
+}
+
+void
+test_create_files_with_same_name()
+{
+    char file_name[] = "file_2";
+    assert(creat(file_name) == 0);
+    assert(dirlookup(root_dir, file_name) != 0);
+}
+
+void
+test_write_into_file()
+{
+char file_name[] = "new_file";
     char file_input_1[] = "File input was written by ME";
     char file_output[100];
 
@@ -57,14 +83,26 @@ main()
     assert(!(strcmp(file_input_2, file_output)));
 
     struct inode *file = dirlookup(root_dir, file_name);
-    assert(file->size == sizeof(file_input_1) + sizeof(file_input_2));
 
+    assert(file->size == sizeof(file_input_1) + sizeof(file_input_2));
     // return 0 if no such file exists
     assert(!dirlookup(root_dir, "random_name"));
     // such file already exists
     assert(dirlink(root_dir, file_name, 123) == -1);
+}
+
+int
+main()
+{
+    printf("Initialize file system\n");
+
+    fs_init();
+
+    test_create_file();
+    test_create_files_with_same_name();
+    test_write_into_file();
+    test_spb();
 
     printf("All tests passed!!!\n");
     return 0;
 }
-
