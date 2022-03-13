@@ -11,7 +11,8 @@ creat(char *file_name)
 {
     struct inode *n_file = ialloc(FILEE);
 
-    dirlink(root_dir, file_name, n_file->inum);
+    if (dirlink(root_dir, file_name, n_file->inum) == -1)
+        return -1;
 
     n_file->nlink = 1;
 

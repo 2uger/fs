@@ -15,4 +15,9 @@
 #define DATA_BLOCKS_NUM 16
 #define MAX_FILE_NAME 16
 
+// spb
+#define SPB_BLOCK_NUM 0
+#define MAGIC_NUM 0x12
+#define INODES_START 1
+#define BITMAP_START 2
 #endif
